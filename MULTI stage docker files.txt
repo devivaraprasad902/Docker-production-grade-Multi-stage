@@ -1,0 +1,64 @@
+MULTI stage docker files
+----------------------------
+NODE
+-------------------------------------------------
+FROM node:24-alpine as dependencies
+WORKDIR /myapp                        ----------------------------> installing dependenices
+COPY package*.json ./
+RUN npm ci
+
+
+FROM node:24-alpine as build
+WORKDIR /myapp  ----->getting dependenices and copying files and building the app(think like it's a compilation stage where all files and dependenices gets compiled)
+
+COPY --from=dependencies /myapp/node_modules ./node_modules   
+COPY . .
+RUN npm run build
+
+FROM node:24-alpine as prod
+WORKDIR /myapp
+COPY package*.json ./               ------> think it's application or code run stage (after compilation will run the application or code right )
+RUN npm ci --omit=dev
+COPY --from=build /myapp/dist ./dist
+EXPOSE 80
+CMD ["node", "dist/index.js"]
+
+------------------------------------------------
+node docker file with two stages 
+--------------------------------------
+
+FROM node:24-alpine as dependencies
+WORKDIR /myapp
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM node:24-alpine as prod
+WORKDIR /myapp
+COPY package*.json ./
+RUN npm ci --omit=dev
+COPY --from=dependencies /myapp/dist ./dist
+RUN chown -R node:node /myapp
+USER node
+EXPOSE 3000
+CMD ["node", "dist/server.js"]
+
+
+----------------------------------------------------------------------------------
+Python
+-----------------
+FROM python:alpine as dependencies
+WORKDIR /myapp
+COPY requirements.txt ./
+RUN pip install --prefix=/depends -r requirements.txt   ----> --prefix=/install creates the source directory, and COPY --from=dependencies
+
+FROM python:alpine as prod
+WORKDIR /myapp
+COPY --from=dependencies /depends /usr/local           ----->/usr/local is common as a destination for the Python image,
+COPY . .
+RUN adduser -D python
+RUN chown -R python:python /myapp
+USER python
+EXPOSE 8000
+CMD ["python","app.py"]
